@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# YOLO Weights & Data (Chặn file nặng)
+*.pt
+1_edge_node/dataset_yolo_merged/
+1_edge_node/test_images/
+
+# Cloud Data
+2_cloud_node/minio_data/
