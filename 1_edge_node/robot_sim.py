@@ -67,7 +67,7 @@ def process_and_upload(image_path):
         payload["detections"].append({
             "class": cls_name,
             "confidence": round(conf, 3),
-            "bbox": map(int, box.xyxy[0])
+            "bbox": list(map(int, box.xyxy[0]))  # <-- Bọc thêm list() ở đây
         })
 
         # Uncertainty Sampling
@@ -113,15 +113,32 @@ def process_and_upload(image_path):
 # CHẠY THỰC NGHIỆM
 # ==========================================
 if __name__ == "__main__":
-    test_img = "test_images/sample.jpg"
-    
-    # Tạo folder và file giả nếu chưa có
-    os.makedirs("test_images", exist_ok=True)
-    if not os.path.exists(test_img):
-        # Tạo 1 ảnh đen trắng trống để test thử api nếu bạn chưa kịp chép ảnh thật
-        import numpy as np
-        cv2.imwrite(test_img, np.zeros((480, 640, 3), dtype=np.uint8))
-        print("Đã tạo ảnh giả lập mẫu tại test_images/sample.jpg")
+    IMAGE_DIR = "test_images"
+    # Định nghĩa các định dạng ảnh được hỗ trợ
+    VALID_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.bmp', '.webp')
 
-    print(f"Đang xử lý khung hình: {test_img}...")
-    process_and_upload(test_img)
+    # 1. Đảm bảo thư mục tồn tại
+    os.makedirs(IMAGE_DIR, exist_ok=True)
+    
+    # 2. Lấy danh sách file và lọc theo định dạng ảnh
+    image_files = [f for f in os.listdir(IMAGE_DIR) 
+                   if f.lower().endswith(VALID_EXTENSIONS)]
+    
+    # 3. Xử lý trường hợp thư mục trống
+    if not image_files:
+        sample_path = os.path.join(IMAGE_DIR, "sample.jpg")
+        import numpy as np
+        # Tạo ảnh đen giả lập để kiểm tra kết nối API
+        cv2.imwrite(sample_path, np.zeros((480, 640, 3), dtype=np.uint8))
+        print(f"⚠️ Thư mục '{IMAGE_DIR}' đang trống. Đã tạo ảnh mẫu: {sample_path}")
+        image_files = ["sample.jpg"]
+
+    print(f"🚀 Tìm thấy {len(image_files)} tệp tin ảnh. Bắt đầu luồng Pipeline...")
+
+    # 4. Vòng lặp xử lý tuần tự (Sequential processing)
+    for filename in sorted(image_files):
+        full_path = os.path.join(IMAGE_DIR, filename)
+        print(f"\n[TIẾN TRÌNH] Đang phân tích: {filename}...")
+        process_and_upload(full_path)
+
+    print(f"\n✅ Đã hoàn tất xử lý {len(image_files)} ảnh. Kiểm tra kết quả tại MinIO Console.")
