@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   minio:
     image: minio/minio:latest
@@ -12,6 +11,27 @@ services:
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
+
+  etl_worker:
+    build: .
+    container_name: etl_worker
+    volumes:
+      - ./duckdb_data:/app/data
+    depends_on:
+      - minio
+    restart: always
+
+  dashboard:
+    build: 
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: mops_dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./duckdb_data:/app/data:ro  # ro = Chỉ đọc (Read-only)
+    depends_on:
+      - etl_worker
 
 volumes:
   minio_data:

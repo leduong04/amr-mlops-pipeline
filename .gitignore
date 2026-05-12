@@ -12,3 +12,11 @@ venv/
 
 # Cloud Data
 2_cloud_node/minio_data/
+2_cloud_node/duckdb_data/
+
+# OS & Editor
+.DS_Store
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints/
