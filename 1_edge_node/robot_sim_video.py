@@ -10,7 +10,8 @@ from datetime import datetime, timezone
 from ultralytics import YOLO
 from minio import Minio
 from dotenv import load_dotenv
-
+import urllib3
+import time
 
 # ==================================================
 # ARGUMENTS
@@ -57,9 +58,35 @@ client = Minio(
     secure=False
 )
 
-model = YOLO(
-    "/home/leduong/DO_AN_MLOPS/1_edge_node/models/yolov8s_best.pt"
-)
+
+def check_and_update_model():
+    print("🔄 [CD Pipeline] Đang kiểm tra bản cập nhật Model mới từ Registry...")
+    try:
+        # Gọi thẳng tới file public hoặc dùng client MinIO để download best_v2.pt
+        response = client.stat_object("model-registry", "best_v2.pt")
+        last_modified = response.last_modified
+        
+        # Nếu chưa có file best_v2.pt trên máy, hoặc model trên cloud mới hơn
+        if not os.path.exists("best_v2.pt"):
+            print("⬇️ Phát hiện trọng số mới (best_v2.pt). Đang tải về Edge Node...")
+            client.fget_object("model-registry", "best_v2.pt", "best_v2.pt")
+            print("✅ Đã cập nhật xong. Hot-swap thành công sang Model V2!")
+            return YOLO('best_v2.pt')
+    except Exception as e:
+        print("Trọng số hiện tại là mới nhất (V1). Bỏ qua cập nhật.")
+        pass
+    
+    return YOLO("/home/leduong/DO_AN_MLOPS/1_edge_node/models/yolov8s_best.pt") # Dùng bản cũ nếu không có bản mới
+
+# Thay đổi lúc khởi tạo model:
+# Mọi khi: model = YOLO('yolov8s.pt')
+# Bây giờ:
+model = check_and_update_model()
+
+
+# model = YOLO(
+#     "/home/leduong/DO_AN_MLOPS/1_edge_node/models/yolov8s_best.pt"
+# )
 
 
 # ==================================================
