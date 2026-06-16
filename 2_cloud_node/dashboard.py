@@ -112,7 +112,37 @@ else:
 
     st.markdown("---")
     st.subheader("Bảng cấp dữ liệu (Real-time Feed)")
-    
-    # Định dạng lại bảng cho đẹp mắt
+
+    # Chuẩn bị dữ liệu hiển thị
     display_df = df[['timestamp', 'robot_id', 'class_name', 'confidence', 'is_ood']].copy()
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+    # Đổi tên cột is_ood -> frame_ood
+    display_df = display_df.rename(columns={
+        'is_ood': 'frame_ood'
+    })
+
+    # Tạo cột object_ood dựa trên confidence
+    display_df['object_ood'] = (
+        (display_df['confidence'] >= 0.3) &
+        (display_df['confidence'] <= 0.6)
+    )
+
+    # Sắp xếp lại thứ tự cột
+    display_df = display_df[
+        [
+            'timestamp',
+            'robot_id',
+            'class_name',
+            'confidence',
+            'frame_ood',
+            'object_ood'
+        ]
+    ]
+
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True
+    )
+
+
