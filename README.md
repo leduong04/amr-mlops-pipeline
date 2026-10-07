@@ -1,81 +1,546 @@
-Đối chiếu hệ thống mã nguồn chúng ta đã xây dựng với đề cương bạn vừa cung cấp, tiến độ dự án của bạn hiện tại đang ở **Tuần 11 - 12**.
+# Edge-to-Cloud MLOps for AMR
 
-Do chúng ta áp dụng phương pháp phát triển Agile (làm đến đâu thông luồng đến đó), các hạng mục đã được giải quyết đan xen và đi rất sát với mục tiêu đề ra ban đầu. Dưới đây là bức tranh rà soát chi tiết:
+Hệ thống MLOps theo kiến trúc **Edge-to-Cloud** phục vụ giám sát và cập nhật mô hình AI cho **Autonomous Mobile Robot (AMR)** trong môi trường nhà kho.
 
-### 1. Các hạng mục đã hoàn thành xuất sắc (100%)
+Đồ án tập trung xây dựng một vòng đời dữ liệu và mô hình khép kín:
 
-* **Tuần 1 - 2 (Thiết kế hệ thống):** Đã chốt kiến trúc Monorepo (chia `1_edge_node` và `2_cloud_node`), xác định giao thức API và sơ đồ luồng dữ liệu.
-* **Tuần 3 - 4 (AI tại biên):** File `robot_sim.py` đã chạy trơn tru, tải mô hình YOLOv8, bóc tách bounding box và giả lập luồng AMR cục bộ.
-* **Tuần 5 - 6 (Thu thập & Lưu trữ):** Container `minio_datalake` đang chạy ổn định. Dữ liệu được đẩy tự động theo thời gian thực phân luồng chuẩn xác vào `logs/` và `anomaly_images/`.
-* **Tuần 7 - 8 (Luồng ETL):** Dịch vụ `etl_worker.py` (chạy ngầm mỗi 30 giây) đã hoàn thành xuất sắc việc làm sạch JSON và nạp vào cấu trúc bảng của **DuckDB** (định dạng tối ưu phân tích).
-
-### 2. Các hạng mục đã hoàn thành một phần (Đang ở trạng thái 70-80%)
-
-* **Tuần 9 - 10 (MLOps & Active Learning):** * *Đã làm được:* Logic `Uncertainty Sampling` (bắt độ tự tin 0.3 - 0.6) để tự động phân loại và cảnh báo dữ liệu dị thường (OOD).
-* *Còn thiếu:* Luồng tải ảnh OOD từ MinIO về máy và chạy script `train.py` để tinh chỉnh (fine-tune) lại mô hình, sau đó cập nhật trọng số mới (`.pt`).
-
-
-* **Tuần 11 - 12 (Dashboard & Kiểm thử):**
-* *Đã làm được:* Khởi chạy thành công Streamlit Dashboard đọc dữ liệu Real-time từ DuckDB, hiển thị các chỉ số (Metrics) cơ bản.
-* *Còn thiếu:* Các biểu đồ đường (Line charts) thể hiện rõ ràng sự biến động (Data Drift) theo thời gian.
-
-
+**Edge Inference → Data Lake → ETL → Analytics → Monitoring → Continuous Training → Model Registry → Edge Update**
 
 ---
 
-Như vậy, "bộ khung xương" của toàn bộ hệ thống Edge-to-Cloud đã hoàn chỉnh. Những gì còn lại chỉ là việc thêm "da thịt" (vẽ biểu đồ) và đóng gói chu trình (viết nốt script huấn luyện lại).
+## 1. Giới thiệu
 
-Để lấp đầy hoàn toàn **Tuần 11 - 12** trước khi quay lại hoàn thiện luồng huấn luyện, bạn có muốn tôi cung cấp ngay đoạn code vẽ **Biểu đồ đường theo dõi Tỷ lệ OOD theo thời gian** để tích hợp vào file `dashboard.py` hiện tại không?
+Trong môi trường nhà kho, mô hình AI triển khai trên robot có thể suy giảm hiệu năng khi điều kiện vận hành thay đổi hoặc xuất hiện các đối tượng chưa có trong tập huấn luyện.
 
+Đồ án xây dựng một hệ thống MLOps nhằm:
 
-Dựa trên kiến trúc chuẩn của một hệ thống MLOps hoàn chỉnh (vòng lặp Edge-to-Cloud), chúng ta đã đi được **khoảng 70%** khối lượng kỹ thuật cốt lõi của đề cương.
-
-Dưới đây là bức tranh tổng thể để bạn dễ dàng đối chiếu với các mục trong báo cáo đồ án:
-
-### Đã hoàn thành (Giai đoạn Data Pipeline & Observability)
-
-1. **Edge AI & Tối ưu luồng dữ liệu (Data Ingestion):** * Xây dựng mô hình suy luận thời gian thực (YOLOv8).
-* Áp dụng *Uncertainty Sampling* (Ngưỡng tự tin $0.3 \le X \le 0.6$).
-* Tối ưu Network I/O (Chỉ gửi JSON với dữ liệu sạch, gửi JSON + Ảnh với OOD).
-
-
-2. **Cloud Data Lake & CSDL Phân tích (Storage & ETL):**
-* Triển khai Object Storage (MinIO) phân tách vùng dữ liệu.
-* Xây dựng ETL Microservice (Worker) tự động bóc tách file phi cấu trúc thành dữ liệu dạng bảng quan hệ (DuckDB).
-
-
-3. **Giám sát mô hình (Model Monitoring):**
-* Khởi tạo Dashboard (Streamlit) đọc dữ liệu từ CSDL OLAP theo thời gian thực.
-* Tính toán các chỉ số *Data Drift/Anomaly Rate* cơ bản.
-
-
+* Triển khai mô hình YOLOv8 tại thiết bị biên.
+* Nhận diện các đối tượng trong môi trường nhà kho.
+* Phát hiện và thu thập các mẫu có độ tin cậy trung bình để phục vụ cải thiện mô hình.
+* Lưu trữ dữ liệu vận hành trên Data Lake.
+* Tự động xử lý dữ liệu bằng ETL Pipeline.
+* Phân tích dữ liệu bằng DuckDB.
+* Giám sát hệ thống thông qua Streamlit Dashboard.
+* Thực hiện Continuous Training trên dữ liệu được thu thập.
+* Lưu phiên bản mô hình mới vào Model Registry để Edge Node có thể cập nhật.
 
 ---
 
-### Chưa hoàn thành (Giai đoạn Machine Learning Pipeline)
+## 2. Kiến trúc hệ thống
 
-Phần còn lại của đồ án là khép kín vòng lặp MLOps (Continuous Training - CT).
+```text
+                         ┌──────────────────────┐
+                         │      Edge Node       │
+                         │                      │
+                         │  YOLOv8s Inference   │
+                         │  OOD Sampling        │
+                         └──────────┬───────────┘
+                                    │
+                       JSON Logs / OOD Images
+                                    │
+                                    ▼
+                    ┌───────────────────────────┐
+                    │           MinIO           │
+                    │         Data Lake         │
+                    │                           │
+                    │  logs/                    │
+                    │  anomaly_images/          │
+                    │  model-registry/          │
+                    └───────┬───────────┬───────┘
+                            │           │
+                       JSON Logs    OOD Images
+                            │           │
+                            ▼           ▼
+                    ┌────────────┐  ┌───────────────┐
+                    │ ETL Worker │  │ Continuous    │
+                    │            │  │ Training      │
+                    └─────┬──────┘  └───────┬───────┘
+                          │                 │
+                          ▼                 │
+                    ┌────────────┐          │
+                    │   DuckDB   │          │
+                    │ Analytics  │          │
+                    └─────┬──────┘          │
+                          │                 │
+                          ▼                 ▼
+                    ┌────────────┐     ┌──────────────┐
+                    │ Streamlit  │     │ Model        │
+                    │ Dashboard  │     │ Registry     │
+                    └────────────┘     └──────┬───────┘
+                                              │
+                                              │ New Model
+                                              ▼
+                                         Edge Node
+```
 
-4. **Huấn luyện lại tự động (Continuous Training / Fine-tuning):** * Trích xuất các bức ảnh nằm trong thư mục `anomaly_images/` trên MinIO.
-* Giả lập quá trình gán nhãn lại (Re-labeling).
-* Huấn luyện chuyển tiếp (Transfer Learning) mô hình YOLO bằng tập dữ liệu OOD mới này.
+### Các thành phần chính
 
+| Thành phần          | Vai trò                                          |
+| ------------------- | ------------------------------------------------ |
+| Edge Node           | Chạy mô hình YOLOv8 và xử lý dữ liệu đầu vào     |
+| MinIO               | Lưu trữ dữ liệu dạng object và Model Registry    |
+| ETL Worker          | Đọc, làm sạch, biến đổi và nạp dữ liệu           |
+| DuckDB              | Lưu trữ và phân tích dữ liệu đã chuẩn hóa        |
+| Dashboard           | Giám sát dữ liệu và trạng thái mô hình           |
+| Continuous Training | Thu thập dữ liệu OOD và thực hiện tái huấn luyện |
+| Model Registry      | Lưu trữ phiên bản mô hình mới                    |
 
-5. **Cập nhật mô hình (Model Registry & CD):**
-* Quản lý phiên bản trọng số mới (`best_v2.pt`).
-* Đóng gói và đẩy (Deploy) mô hình mới từ Cloud về lại Edge Node (AMR) để thay thế mô hình cũ mà không làm sập hệ thống.
+---
 
+## 3. Mô hình AI
 
+Hệ thống sử dụng **YOLOv8** cho bài toán phát hiện đối tượng.
 
-Để tiếp tục, bạn muốn thêm biểu đồ đường (Line Chart) vào Dashboard để đóng gói hoàn toàn Giai đoạn 3, hay chúng ta tiến thẳng sang Giai đoạn 4: Viết script tự động kéo ảnh OOD từ MinIO xuống để huấn luyện lại mô hình?
+Các lớp đối tượng trong phạm vi đồ án:
 
+1. Person
+2. Forklift
+3. Carton Box
+4. Safety Cone
+5. Wet Floor Sign
 
-leduong@leduongPC:~$ ssh root@188.166.211.30
-hlDn21082004a
-root@mlops-amr-server:~# cd ~/mlops_pipeline
-root@mlops-amr-server:~# cd ~/mlops_pipeline
-root@mlops-amr-server:~/mlops_pipeline# docker compose up -d --build
-http://188.166.211.30:9001/browser/robot-logs
-http://188.166.211.30:8501/
+Mô hình được triển khai tại Edge Node nhằm thực hiện suy luận trực tiếp thay vì gửi toàn bộ luồng video lên Cloud.
 
-(venv) leduong@leduongPC:~/DO_AN_MLOPS/1_edge_node$ python Draft_sim.py --robot_id AMR_01 --video "/home/leduong/DO_AN_MLOPS/1_edge_node/test_videos/warehouse2.mp4" --skip_frames 2
+### Kết quả mô hình
+
+Mô hình YOLOv8s đạt:
+
+* **mAP@0.5:0.95:** 78.8%
+* **Inference speed:** 81.78 FPS
+
+Việc lựa chọn YOLOv8s nhằm cân bằng giữa độ chính xác và tốc độ suy luận trong môi trường tài nguyên hạn chế.
+
+---
+
+## 4. Cơ chế thu thập dữ liệu bất định
+
+Edge Node không gửi toàn bộ video lên Data Lake.
+
+Sau mỗi lần suy luận, hệ thống kiểm tra confidence của các đối tượng được phát hiện.
+
+Các dự đoán nằm trong khoảng:
+
+```text
+0.3 ≤ confidence ≤ 0.6
+```
+
+được đánh dấu là dữ liệu bất định và được sử dụng để thu thập ảnh OOD phục vụ quá trình Continuous Training.
+
+Dữ liệu được phân thành:
+
+```text
+logs/
+    └── *.json
+
+anomaly_images/
+    └── *.jpg
+```
+
+Cách tiếp cận này giúp giảm lượng dữ liệu cần truyền và lưu trữ so với việc gửi toàn bộ video.
+
+> Lưu ý: trong phạm vi đồ án, confidence threshold được sử dụng như một heuristic cho Uncertainty Sampling; đây không phải là một thuật toán OOD Detection hoàn chỉnh theo nghĩa lý thuyết.
+
+---
+
+## 5. Data Lake với MinIO
+
+MinIO đóng vai trò là tầng lưu trữ object trung tâm.
+
+### `logs/`
+
+Lưu các bản ghi JSON được tạo từ Edge Node.
+
+Thông tin chính bao gồm:
+
+* `trace_id`
+* `timestamp`
+* `robot_id`
+* `is_ood`
+* danh sách detections
+* class
+* confidence
+
+### `anomaly_images/`
+
+Lưu các hình ảnh được lựa chọn thông qua cơ chế confidence-based sampling.
+
+### `model-registry/`
+
+Lưu các phiên bản model được tạo sau quá trình Continuous Training.
+
+Ví dụ:
+
+```text
+model-registry/
+└── best_v2.pt
+```
+
+Việc sử dụng MinIO giúp tách biệt dữ liệu gốc khỏi tầng phân tích.
+
+---
+
+## 6. ETL Pipeline
+
+ETL Worker định kỳ quét thư mục `logs/` trên MinIO.
+
+Quy trình:
+
+```text
+Extract
+   ↓
+Đọc JSON từ MinIO
+   ↓
+Transform
+   ↓
+Flatten detections
+   ↓
+Chuẩn hóa dữ liệu
+   ↓
+Load
+   ↓
+DuckDB
+```
+
+Mỗi detection được chuyển thành một bản ghi độc lập trong bảng `detections`.
+
+Ví dụ:
+
+```text
+trace_id
+timestamp
+robot_id
+class_name
+confidence
+is_ood
+processed_at
+```
+
+### Idempotency
+
+ETL Worker sử dụng bảng:
+
+```text
+processed_files
+```
+
+để lưu các file JSON đã được xử lý.
+
+Nhờ đó, cùng một file không bị nạp nhiều lần vào bảng `detections`.
+
+---
+
+## 7. DuckDB
+
+DuckDB được sử dụng làm hệ quản trị cơ sở dữ liệu phân tích cho tầng dữ liệu đã được ETL.
+
+Các bảng chính:
+
+```text
+detections
+processed_files
+```
+
+### `detections`
+
+Lưu dữ liệu detection đã được chuẩn hóa.
+
+### `processed_files`
+
+Theo dõi các file JSON đã được xử lý nhằm đảm bảo tính idempotent của ETL Pipeline.
+
+Dashboard kết nối DuckDB ở chế độ **Read-Only** để truy vấn dữ liệu.
+
+---
+
+## 8. Dashboard
+
+Dashboard được xây dựng bằng **Streamlit**.
+
+Các chỉ số chính:
+
+* Total Inferences
+* OOD Objects
+* Anomaly Rate
+* Data Drift / OOD trend
+* Real-time Detection Feed
+
+Dashboard truy vấn dữ liệu từ DuckDB và hiển thị dưới dạng:
+
+* KPI Cards
+* Line Chart
+* Data Table
+
+Dashboard được thiết kế để phục vụ giám sát dữ liệu và tình trạng hoạt động của hệ thống MLOps.
+
+---
+
+## 9. Continuous Training
+
+Continuous Training Pipeline sử dụng dữ liệu OOD được thu thập từ MinIO.
+
+Quy trình:
+
+```text
+OOD Images
+     ↓
+Dataset
+     ↓
+Teacher Model
+     ↓
+Pseudo-labeling
+     ↓
+Student Model
+     ↓
+Fine-tuning
+     ↓
+best_v2.pt
+     ↓
+Model Registry
+```
+
+### Teacher Model
+
+Teacher Model được sử dụng để thực hiện pseudo-labeling trên các ảnh được lựa chọn từ quá trình vận hành.
+
+### Student Model
+
+Student Model là mô hình YOLOv8s được fine-tune từ trọng số hiện tại với dữ liệu mới.
+
+Sau khi huấn luyện, trọng số mới được đưa vào:
+
+```text
+model-registry/best_v2.pt
+```
+
+---
+
+## 10. Cập nhật mô hình tại Edge
+
+Khi Edge Node khởi động, chương trình kiểm tra Model Registry trên MinIO.
+
+Nếu tìm thấy phiên bản model mới, hệ thống tải model về thiết bị và sử dụng phiên bản đó cho quá trình suy luận.
+
+Nếu không thể truy cập Model Registry, hệ thống sử dụng model cục bộ đã được lưu sẵn.
+
+Luồng cập nhật:
+
+```text
+Model Registry
+      │
+      ▼
+Check New Model
+      │
+      ├── Có model mới
+      │       ↓
+      │   Download
+      │       ↓
+      │   Load Model
+      │
+      └── Không có / lỗi kết nối
+              ↓
+          Local Model
+```
+
+---
+
+## 11. Docker
+
+Các thành phần của hệ thống được triển khai trong môi trường container để thuận tiện cho quá trình cấu hình và vận hành.
+
+Các container được sử dụng trong hệ thống có thể bao gồm:
+
+```text
+MinIO
+ETL Worker
+Dashboard
+Continuous Training
+```
+
+Mỗi thành phần có môi trường runtime độc lập, giúp giảm sự phụ thuộc giữa các thư viện và môi trường thực thi.
+
+---
+
+## 12. Cấu trúc source code
+
+Cấu trúc thư mục tham khảo:
+
+```text
+.
+├── robot_sim_video.py
+├── etl_worker.py
+├── dashboard.py
+├── ct_pipeline.py
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+├── data/
+└── README.md
+```
+
+Tùy phiên bản source code, cấu trúc thư mục có thể thay đổi.
+
+---
+
+## 13. Yêu cầu môi trường
+
+Các thành phần chính được xây dựng bằng Python.
+
+Một số thư viện sử dụng:
+
+```text
+Python
+OpenCV
+Ultralytics
+PyTorch
+Pandas
+DuckDB
+Boto3
+Streamlit
+MinIO
+Docker
+```
+
+---
+
+## 14. Chạy hệ thống
+
+### Bước 1: Clone repository
+
+```bash
+git clone <REPOSITORY_URL>
+cd <PROJECT_DIRECTORY>
+```
+
+### Bước 2: Khởi động các dịch vụ
+
+Nếu repository có `docker-compose.yml`:
+
+```bash
+docker compose up -d
+```
+
+Kiểm tra container:
+
+```bash
+docker compose ps
+```
+
+### Bước 3: Kiểm tra MinIO
+
+Đảm bảo MinIO đang hoạt động và các bucket/object cần thiết đã được cấu hình.
+
+### Bước 4: Khởi động ETL Worker
+
+Nếu chạy trực tiếp:
+
+```bash
+python etl_worker.py
+```
+
+### Bước 5: Khởi động Dashboard
+
+```bash
+streamlit run dashboard.py
+```
+
+Dashboard mặc định sử dụng cổng:
+
+```text
+8501
+```
+
+---
+
+## 15. Luồng hoạt động tổng thể
+
+Toàn bộ hệ thống vận hành theo chu trình:
+
+```text
+                    ┌──────────────┐
+                    │   YOLOv8s    │
+                    │ Edge Inference│
+                    └──────┬───────┘
+                           │
+                    Detection Results
+                           │
+                           ▼
+                    ┌──────────────┐
+                    │    MinIO     │
+                    │   Data Lake  │
+                    └──────┬───────┘
+                           │
+                ┌──────────┴──────────┐
+                │                     │
+                ▼                     ▼
+          ┌──────────┐         ┌─────────────┐
+          │   ETL    │         │ Continuous  │
+          │  Worker  │         │  Training   │
+          └────┬─────┘         └──────┬──────┘
+               │                      │
+               ▼                      ▼
+          ┌──────────┐          ┌─────────────┐
+          │ DuckDB   │          │Model Registry│
+          └────┬─────┘          └──────┬──────┘
+               │                       │
+               ▼                       │
+          ┌──────────┐                 │
+          │Dashboard │                 │
+          └──────────┘                 │
+                                       │
+                                       ▼
+                                  Edge Node
+```
+
+Đây là vòng lặp dữ liệu và mô hình của hệ thống:
+
+**Inference → Data Collection → ETL → Monitoring → Continuous Training → Model Update → Inference**
+
+---
+
+## 16. Hạn chế
+
+Một số giới hạn của phiên bản hiện tại:
+
+* Cơ chế phát hiện dữ liệu bất định chủ yếu dựa trên ngưỡng confidence.
+* Edge Node chưa được tích hợp trực tiếp với phần cứng AMR vật lý.
+* Hệ thống chưa triển khai cơ chế lưu đệm và đồng bộ lại dữ liệu khi kết nối mạng bị gián đoạn.
+* Continuous Training phụ thuộc đáng kể vào tài nguyên tính toán của môi trường huấn luyện.
+* Quy mô thử nghiệm hiện tại chưa đại diện cho hệ thống triển khai với hàng trăm AMR.
+
+---
+
+## 17. Hướng phát triển
+
+Các hướng phát triển tiếp theo:
+
+* Tích hợp hệ thống với ROS2 và phần cứng AMR thực tế.
+* Xây dựng cơ chế Local Buffer và Retry cho Edge-to-Cloud communication.
+* Nghiên cứu các phương pháp OOD Detection chuyên biệt.
+* Tối ưu Continuous Training trên GPU.
+* Bổ sung Model Versioning và Experiment Tracking.
+* Mở rộng kiến trúc để hỗ trợ nhiều robot đồng thời.
+* Bổ sung cơ chế xác thực và bảo mật cho các API và object storage.
+
+---
+
+## 18. Thông tin đồ án
+
+**Đề tài:** Thiết kế và triển khai hệ thống MLOps giám sát và cập nhật mô hình AI cho AMR dựa trên kiến trúc Edge-to-Cloud.
+
+**Lĩnh vực:** Artificial Intelligence / Computer Vision / MLOps / Edge Computing / Data Engineering
+
+**Mô hình:** YOLOv8
+
+**Object Storage:** MinIO
+
+**Analytics Database:** DuckDB
+
+**Dashboard:** Streamlit
+
+**Containerization:** Docker
+
+---
+
+## License
+
+Source code được sử dụng cho mục đích học tập và nghiên cứu trong phạm vi đồ án tốt nghiệp.
